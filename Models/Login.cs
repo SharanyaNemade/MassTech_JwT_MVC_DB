@@ -1,4 +1,4 @@
-﻿namespace JwTDBLogin.Models
+namespace JwTDBLogin.Models
 {
     public class LoginModel
     {
