@@ -6,6 +6,8 @@ using System.Security.Claims;
 using System.Text;
 using System.Data;
 using Microsoft.Data.SqlClient;
+using OtpNet;
+using QRCoder;
 
 namespace JwTDBLogin.Controllers
 {
@@ -21,7 +23,7 @@ namespace JwTDBLogin.Controllers
         public IActionResult Logout()
         {
             Response.Cookies.Delete("jwt");
-            return RedirectToAction("Login","Account");
+            return RedirectToAction("Login", "Account");
         }
 
         [HttpGet]
@@ -35,6 +37,7 @@ namespace JwTDBLogin.Controllers
             return View();
         }
 
+        // LOGIN STEP
         [HttpPost]
         public IActionResult Login(LoginModel model)
         {
@@ -54,15 +57,14 @@ namespace JwTDBLogin.Controllers
 
                 if (dr.Read())
                 {
-                    string token = GenerateJwtToken(model.Username);
+                    // Generate Secret Key
+                    byte[] secretKey = KeyGeneration.GenerateRandomKey(20);
+                    string base32Secret = Base32Encoding.ToString(secretKey);
 
-                    Response.Cookies.Append("jwt", token, new CookieOptions
-                    {
-                        HttpOnly = true,
-                        Secure = false
-                    });
+                    HttpContext.Session.SetString("User", model.Username);
+                    HttpContext.Session.SetString("TwoFASecret", base32Secret);
 
-                    return RedirectToAction("Dashboard", "Home");
+                    return RedirectToAction("Setup2FA");
                 }
             }
 
@@ -70,6 +72,71 @@ namespace JwTDBLogin.Controllers
             return View();
         }
 
+        // DISPLAY QR CODE
+        public IActionResult Setup2FA()
+        {
+            string? secret = HttpContext.Session.GetString("TwoFASecret");
+            string? username = HttpContext.Session.GetString("User");
+
+            if (secret == null || username == null)
+                return RedirectToAction("Login");
+
+            string qrCodeImage = GenerateQrCode(secret, username);
+
+            ViewBag.QRCode = qrCodeImage;
+            ViewBag.Secret = secret;
+
+            return View();
+        }
+
+        // VERIFY AUTHENTICATOR CODE
+        [HttpPost]
+        public IActionResult Verify2FA(string code)
+        {
+            string? secret = HttpContext.Session.GetString("TwoFASecret");
+            string? username = HttpContext.Session.GetString("User");
+
+            if (secret == null || username == null)
+                return RedirectToAction("Login");
+
+            byte[] secretBytes = Base32Encoding.ToBytes(secret);
+
+            Totp totp = new Totp(secretBytes);
+
+            bool isValid = totp.VerifyTotp(code, out long step);
+
+            if (isValid)
+            {
+                string token = GenerateJwtToken(username);
+
+                Response.Cookies.Append("jwt", token, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = false
+                });
+
+                return RedirectToAction("Dashboard");
+            }
+
+            ViewBag.Error = "Invalid Code";
+            return View("Setup2FA");
+        }
+
+        // QR CODE GENERATION
+        private string GenerateQrCode(string secretKey, string username)
+        {
+            string uri = $"otpauth://totp/JwtMvcDemo:{username}?secret={secretKey}&issuer=JwtMvcDemo";
+
+            QRCodeGenerator qrGenerator = new QRCodeGenerator();
+            QRCodeData qrCodeData = qrGenerator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
+
+            PngByteQRCode qrCode = new PngByteQRCode(qrCodeData);
+            byte[] qrCodeImage = qrCode.GetGraphic(20);
+
+            return "data:image/png;base64," + Convert.ToBase64String(qrCodeImage);
+        }
+
+        // JWT TOKEN
         private string GenerateJwtToken(string username)
         {
             var key = new SymmetricSecurityKey(
@@ -91,7 +158,5 @@ namespace JwTDBLogin.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-
-        
     }
 }

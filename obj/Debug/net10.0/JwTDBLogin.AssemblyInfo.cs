@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("JwTDBLogin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1c419edbd81675d6a5195219d5ad1c7411542759")]
 [assembly: System.Reflection.AssemblyProductAttribute("JwTDBLogin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("JwTDBLogin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
